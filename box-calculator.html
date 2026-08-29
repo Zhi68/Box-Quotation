@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>纸箱成本计算器（内部版）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B2A38;
+    --ink-soft:#3E5062;
+    --paper:#EFEDE6;
+    --paper-card:#FBFAF7;
+    --line:#DAD6CB;
+    --kraft:#A9713F;
+    --kraft-dark:#8A5A30;
+    --sage:#4C7A5E;
+    --sage-bg:#E7EFE9;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .top-flute{
+    height:10px;
+    background:repeating-linear-gradient(90deg, var(--kraft) 0 4px, var(--kraft-dark) 4px 8px);
+    opacity:.55;
+  }
+  header{
+    padding:28px 24px 18px;
+    max-width:1100px;
+    margin:0 auto;
+  }
+  h1{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    font-size:34px;
+    letter-spacing:.3px;
+    margin:0 0 4px;
+    color:var(--ink);
+  }
+  header p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:14px;
+  }
+  .wrap{
+    max-width:1100px;
+    margin:0 auto;
+    padding:0 24px 60px;
+    display:grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap:22px;
+    align-items:start;
+  }
+  @media (max-width: 860px){
+    .wrap{ grid-template-columns: 1fr; }
+    .results{ position:static !important; }
+  }
+  .card{
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px 22px;
+    margin-bottom:16px;
+  }
+  .card h2{
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:19px;
+    font-weight:600;
+    letter-spacing:.2px;
+    margin:0 0 14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--kraft-dark);
+    border-bottom:1px solid var(--line);
+    padding-bottom:10px;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(130px,1fr));
+    gap:14px;
+  }
+  .field label{
+    display:block;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-bottom:5px;
+    font-weight:500;
+  }
+  .field input, .field select{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:#fff;
+    font-size:14.5px;
+    font-family:'JetBrains Mono', monospace;
+    color:var(--ink);
+    transition:border-color .15s;
+  }
+  .field select{ font-family:'Inter',sans-serif; }
+  .field input:focus, .field select:focus{
+    outline:none;
+    border-color:var(--kraft);
+    box-shadow:0 0 0 3px rgba(169,113,63,.14);
+  }
+  .field .hint{
+    font-size:11px;
+    color:#8A8A82;
+    margin-top:4px;
+  }
+  .field.readonly input, .field.readonly .ro-box{
+    background:var(--sage-bg);
+    border-color:#cfe0d5;
+    color:var(--sage);
+    font-weight:600;
+  }
+  .ro-box{
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    font-size:14.5px;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .results{
+    position:sticky;
+    top:20px;
+    background:var(--ink);
+    color:#fff;
+    border-radius:10px;
+    padding:22px 22px 20px;
+  }
+  .results h2{
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:20px;
+    font-weight:600;
+    margin:0 0 16px;
+    color:#fff;
+    border-bottom:1px solid rgba(255,255,255,.15);
+    padding-bottom:10px;
+  }
+  .result-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding:8px 0;
+    border-bottom:1px dashed rgba(255,255,255,.12);
+    font-size:14px;
+  }
+  .result-row .label{ color:rgba(255,255,255,.65); }
+  .result-row .val{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:600;
+    font-variant-numeric:tabular-nums;
+  }
+  .result-row.final{
+    margin-top:10px;
+    border:none;
+    background:linear-gradient(135deg, var(--kraft) 0%, var(--kraft-dark) 100%);
+    border-radius:8px;
+    padding:14px 14px;
+  }
+  .result-row.final .label{ color:rgba(255,255,255,.9); font-size:14px; font-weight:600;}
+  .result-row.final .val{ font-size:24px; }
+  .result-row.unit{
+    background:var(--sage);
+    border-radius:8px;
+    padding:10px 14px;
+    border:none;
+    margin-top:8px;
+  }
+  .result-row.unit .label{ color:rgba(255,255,255,.9); }
+  .divider-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:rgba(255,255,255,.4);
+    margin:14px 0 4px;
+  }
+  .actions{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+  }
+  button{
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    padding:9px 16px;
+    border-radius:7px;
+    border:1px solid rgba(255,255,255,.25);
+    background:transparent;
+    color:#fff;
+    cursor:pointer;
+    transition:background .15s;
+  }
+  button:hover{ background:rgba(255,255,255,.1); }
+  .note{
+    font-size:12px;
+    line-height:1.7;
+    color:var(--ink-soft);
+    background:var(--sage-bg);
+    border:1px solid #cfe0d5;
+    border-radius:8px;
+    padding:10px 12px;
+    margin-top:2px;
+  }
+  .note b{ color:var(--sage); }
+  .mini-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+    margin-top:10px;
+  }
+  .comp-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:rgba(255,255,255,.4);
+    margin:10px 0 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-flute"></div>
+<header>
+  <h1>📦 纸箱成本计算器</h1>
+  <p>内部使用版 · 多箱型自动套用公式 · ID/ED 自动换算</p>
+</header>
+
+<div class="wrap">
+  <div>
+
+    <div class="card">
+      <h2>基本信息</h2>
+      <div class="grid">
+        <div class="field">
+          <label>箱型</label>
+          <select id="boxType">
+            <option value="RSC">普通纸箱（RSC）</option>
+            <option value="FPF">侧封箱（FPF）</option>
+            <option value="TOPOPEN">中封箱（TOP OPEN）</option>
+            <option value="TOPBTM">天地盖（TOP&amp;BTM）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>生产数量（个）</label>
+          <input type="number" id="qty" value="1000" min="0">
+        </div>
+        <div class="field">
+          <label>尺寸类型</label>
+          <select id="sizeMode">
+            <option value="ID">ID</option>
+            <option value="ED">ED</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>尺寸参数（mm）</h2>
+      <div class="grid">
+        <div class="field">
+          <label>长 L</label>
+          <input type="number" id="L" value="300" min="0">
+        </div>
+        <div class="field">
+          <label>宽 W</label>
+          <input type="number" id="W" value="200" min="0">
+        </div>
+        <div class="field">
+          <label>高 H</label>
+          <input type="number" id="H" value="200" min="0">
+        </div>
+      </div>
+
+      <div class="mini-grid">
+        <div class="field readonly">
+          <label>生产尺寸 ED（长×宽×高）</label>
+          <div class="ro-box" id="r_prodDims">- × - × -</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>材料与工艺</h2>
+      <div class="grid">
+        <div class="field">
+          <label>纸板层数</label>
+          <select id="layers">
+            <option value="3">三层</option>
+            <option value="5">五层</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>瓦楞类型</label>
+          <select id="flute"></select>
+        </div>
+        <div class="field">
+          <label>加工费（RM/㎡）</label>
+          <input type="number" id="boardPrice" value="3.5" step="0.01" min="0">
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:14px;">
+        <div class="field">
+          <label>材质类型</label>
+          <select id="materialType"></select>
+        </div>
+        <div class="field readonly">
+          <label>加工费换算（RM/吨）</label>
+          <div class="ro-box" id="processPricePerTon">-</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="results">
+    <h2>📊 计算结果</h2>
+
+    <div id="dimsRows"></div>
+    <div class="result-row"><span class="label">纸箱面积（单个，合计）</span><span class="val" id="r_area">0.0000 ㎡</span></div>
+
+    <div class="divider-label">成本明细（本批合计）</div>
+    <div class="result-row"><span class="label">加工费成本</span><span class="val" id="r_material">RM 0.00</span></div>
+    <div class="result-row"><span class="label">材质成本</span><span class="val" id="r_print">RM 0.00</span></div>
+
+    <div class="result-row final">
+      <span class="label">合计总价</span><span class="val" id="r_final">RM 0.00</span>
+    </div>
+    <div class="result-row unit">
+      <span class="label">单个单价</span><span class="val" id="r_unitPrice">RM 0.00 / 个</span>
+    </div>
+
+    <div class="divider-label">体积（按生产尺寸 ED）</div>
+    <div class="result-row"><span class="label">单个体积</span><span class="val" id="r_unitVol">0.000000 m³</span></div>
+    <div class="result-row"><span class="label">总体积</span><span class="val" id="r_totalVol">0.000 m³</span></div>
+
+    <div class="actions">
+      <button onclick="resetAll()">重置数据</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const num = id => parseFloat($(id).value) || 0;
+
+  // ---------- 箱型公式 ----------
+  // 每个箱型返回一个「部件」数组，每个部件有 length（毛长）和 width（毛宽）
+  // L/W/H = 生产尺寸(ED)，A=加分，T=钉条
+  const boxFormulas = {
+    RSC: {
+      label: [],
+      components: (L,W,H,A,T) => [
+        { name:'', length:(L+W)*2+T, width:W+H+A }
+      ]
+    },
+    FPF: {
+      label: [],
+      components: (L,W,H,A,T) => [
+        { name:'', length: W*2+H*3, width: L+2*H }
+      ]
+    },
+    TOPOPEN: {
+      label: [],
+      components: (L,W,H,A,T) => [
+        { name:'', length: W*2+H*2, width: H*2+L }
+      ]
+    },
+    TOPBTM: {
+      label: [],
+      components: (L,W,H,A,T) => [
+        { name:'地盖', length: 2*(H-3)+(L-16), width: 2*(H-3)+(W-16) },
+        { name:'天盖', length: 2*H+W,          width: 2*H+L }
+      ]
+    }
+  };
+
+  // ---------- 材质与单价（按层数） ----------
+  // 每项：[材质名称, 面积单价(RM/㎡), 克重(g/㎡)]
+  const materialsByLayer = {
+    3: [
+      ["T150/M/M (AF)",0.930,400], ["W175/M/T150 (AF)",1.600,505], ["150 LBS (AF)",1.500,542],
+      ["T175/M180/T175 (AF)",1.518,640], ["W175/M150/K275 (AF)",2.460,675], ["W175/M/T175 (AF)",1.445,530],
+      ["T150/M150/T150 (AF)",1.300,525], ["200 LBS (AF)",1.880,775], ["M/M/M (AF)",0.920,350],
+      ["T150/M/T150 (AF)",1.048,450], ["K175/M180/K175 (AF)",1.695,620], ["T175/M/T175 (AF)",1.270,530],
+      ["W175/M/M (AF)",1.520,475], ["K150/M/K150 (AF)",1.310,480], ["T175/M150/T175 (AF)",1.500,575],
+      ["K175/M/K175 (AF)",1.400,530], ["M/M/M (BF)",0.920,350], ["W175/M/T150 (BF)",1.600,505],
+      ["200 LBS (BF)",1.820,775], ["150 LBS (BF)",1.500,518], ["125 LBS (BF)",1.370,485],
+      ["T150/M/T150 (BF)",1.048,450], ["K175/M180/K175 (BF)",1.695,620], ["T175/M/T175 (BF)",1.270,530],
+      ["W175/M/T175 (BF)",1.445,530], ["W175/M/M (BF)",1.520,475], ["W175/M150/K275 (BF)",2.460,675],
+      ["175 LBS (BF)",1.900,542], ["T150/M/M (BF)",0.930,400], ["K175/M150/K175 (BF)",1.628,575],
+      ["K275/M/K275 (BF)",2.338,730], ["W175/M/W175 (BF)",2.070,530], ["T175/M/T150 (BF)",1.126,475],
+      ["T175/M180/T175 (BF)",1.518,640], ["S/FACE (M/M BF)",0.700,285], ["T150/M150/M150 (BF)",1.238,525],
+      ["K150/M/K150 (BF)",1.310,480], ["T175/M150/T175 (BF)",1.500,575], ["K175/M/K175 (BF)",1.400,530],
+      ["T150/M150/T150 (BF)",1.300,525]
+    ],
+    5: [
+      ["150 LBS",2.100,780], ["175 LBS",2.180,830], ["200 LBS",2.300,1085],
+      ["250 LBS",2.550,948], ["275 LBS",2.850,1185], ["T150/M/M/M/M",1.520,650],
+      ["T150/M/M/M/T150",1.640,700], ["T175/M/M/M/T175",1.980,830], ["W175/M/M/M/M",2.280,775],
+      ["T175/M/M/M150/T175",2.351,875], ["W175/M/M/M150/T150",2.620,850], ["130 LBS",1.980,830],
+      ["160 LBS",2.100,780], ["200 LBS (W) (BAF)",2.755,920], ["230 LBS",2.550,920],
+      ["300 LBS",3.100,1275], ["K175/M150/M150/M150/K175",2.670,950], ["K175/M/M/M/M",2.130,775],
+      ["K175/M/M/M150/K175",2.400,875], ["K275/M/M/M150/K175 (BAF)",3.018,975], ["M/M/M/M/M (ABF)",1.720,600],
+      ["T150/M/M150/M/T150",1.860,810], ["T175/M150/M150/M150/T175",2.597,950], ["TL175/M/M/M/TL175",1.750,750],
+      ["W175/M/M/M/T150",2.550,805], ["W175/M/K150/M/K175",3.380,860], ["W175/M/M/M/K175",2.990,830]
+    ]
+  };
+
+  // 按 A~Z、1~9 排序：字母开头的排前面（按字母序），数字开头的排后面（按数值大小）
+  function sortMaterials(list){
+    return list.slice().sort((a,b) => {
+      const nameA = a[0], nameB = b[0];
+      const digitA = /^[0-9]/.test(nameA);
+      const digitB = /^[0-9]/.test(nameB);
+      if(digitA !== digitB) return digitA ? 1 : -1;
+      if(!digitA) return nameA.localeCompare(nameB, 'en', {sensitivity:'base'});
+      const numA = parseFloat(nameA), numB = parseFloat(nameB);
+      if(numA !== numB) return numA - numB;
+      return nameA.localeCompare(nameB);
+    });
+  }
+  Object.keys(materialsByLayer).forEach(k => {
+    materialsByLayer[k] = sortMaterials(materialsByLayer[k]);
+  });
+
+  // ID→ED 换算表，及加分/钉条常数（均按层数区分）
+  const layerRules = {
+    3: { addL:4, addW:4, addH:8, addOn:3, tab:28 },
+    5: { addL:7, addW:7, addH:15, addOn:6, tab:35 }
+  };
+
+  function currentLayer(){
+    return parseInt($('layers').value);
+  }
+
+  let activeMaterials = [];
+
+  function populateFlutes(){
+    const layer = currentLayer();
+    const sel = $('flute');
+    if(layer === 3){
+      sel.innerHTML = '<option value="AF">AF</option><option value="BF">BF</option>';
+    } else {
+      sel.innerHTML = '<option value="BAF">BAF</option>';
+    }
+  }
+
+  function populateMaterials(){
+    const layer = currentLayer();
+    const flute = $('flute').value;
+    const sel = $('materialType');
+    const prevName = sel.value !== '' && activeMaterials[sel.value] ? activeMaterials[sel.value][0] : null;
+
+    let list = materialsByLayer[layer];
+    if(layer === 3){
+      list = list.filter(m => m[0].indexOf('(' + flute + ')') !== -1);
+    }
+    // 五层材质本身就都是 BAF，全部显示，不用过滤
+    activeMaterials = list;
+
+    sel.innerHTML = list.map((m,i) => `<option value="${i}">${m[0]}</option>`).join('');
+    const matchIdx = prevName ? list.findIndex(m => m[0] === prevName) : -1;
+    sel.value = matchIdx !== -1 ? matchIdx : '0';
+  }
+
+  function convertToProd(mode, L, W, H, layer){
+    if(mode === 'ED') return { L, W, H };
+    const r = layerRules[layer];
+    return { L: L + r.addL, W: W + r.addW, H: H + r.addH };
+  }
+
+  function renderDimsRows(components){
+    const container = $('dimsRows');
+    container.innerHTML = components.map(c => {
+      const prefix = c.name ? (c.name + ' ') : '';
+      return `
+        <div class="result-row"><span class="label">${prefix}毛长（展开长）</span><span class="val">${c.length.toFixed(1)} mm</span></div>
+        <div class="result-row"><span class="label">${prefix}毛宽（展开宽）</span><span class="val">${c.width.toFixed(1)} mm</span></div>
+      `;
+    }).join('');
+  }
+
+  function calculate(){
+    const boxKey = $('boxType').value;
+    const layer = currentLayer();
+    const mode = $('sizeMode').value;
+    const qty = num('qty');
+    const L = num('L'), W = num('W'), H = num('H');
+
+    const prod = convertToProd(mode, L, W, H, layer);
+    const rules = layerRules[layer];
+
+    const components = boxFormulas[boxKey].components(prod.L, prod.W, prod.H, rules.addOn, rules.tab);
+    renderDimsRows(components);
+
+    let areaSqm = 0;
+    components.forEach(c => { areaSqm += (c.length * c.width) / 1000000; });
+
+    const processPrice = num('boardPrice'); // 加工费 RM/㎡
+    const matIdx = parseInt($('materialType').value);
+    const mat = activeMaterials[matIdx] || ['-',0,0];
+    const matPrice = mat[1];
+    const matWeight = mat[2]; // 克重 g/㎡
+
+    // 加工费 RM/㎡ 换算成 RM/吨：1吨 = 1,000,000克，每㎡重 matWeight 克
+    // 所以 1吨对应的面积 = 1,000,000 / matWeight ㎡，加工费(RM/吨) = processPrice × (1,000,000 / matWeight)
+    const processPricePerTon = matWeight > 0 ? processPrice * 1000000 / matWeight : 0;
+
+    const processCost = areaSqm * processPrice * qty;
+    const materialCost = areaSqm * matPrice * qty;
+
+    const finalTotal = processCost + materialCost;
+    const unitPrice = qty > 0 ? finalTotal / qty : 0;
+
+    const unitVol = (prod.L * prod.W * prod.H) / 1e9;
+    const totalVol = unitVol * qty;
+
+    $('r_prodDims').textContent = `${prod.L.toFixed(1)} × ${prod.W.toFixed(1)} × ${prod.H.toFixed(1)} mm`;
+    $('processPricePerTon').textContent = 'RM ' + processPricePerTon.toFixed(2) + ' /吨';
+
+    $('r_area').textContent = areaSqm.toFixed(4) + ' ㎡';
+    $('r_material').textContent = 'RM ' + processCost.toFixed(2);
+    $('r_print').textContent = 'RM ' + materialCost.toFixed(2);
+    $('r_final').textContent = 'RM ' + finalTotal.toFixed(2);
+    $('r_unitPrice').textContent = 'RM ' + unitPrice.toFixed(4) + ' / 个';
+    $('r_unitVol').textContent = unitVol.toFixed(6) + ' m³';
+    $('r_totalVol').textContent = totalVol.toFixed(3) + ' m³';
+  }
+
+  function resetAll(){
+    const defaults = { qty:1000, L:300, W:200, H:200, boardPrice:3.5 };
+    Object.keys(defaults).forEach(id => { $(id).value = defaults[id]; });
+    $('layers').value = '3';
+    $('sizeMode').value = 'ID';
+    $('boxType').value = 'RSC';
+    populateFlutes();
+    $('flute').value = 'AF';
+    populateMaterials();
+    calculate();
+  }
+
+  document.querySelectorAll('input, select').forEach(el => {
+    if(el.id !== 'layers' && el.id !== 'flute'){
+      el.addEventListener('input', calculate);
+    }
+  });
+  $('layers').addEventListener('input', () => { populateFlutes(); populateMaterials(); calculate(); });
+  $('flute').addEventListener('input', () => { populateMaterials(); calculate(); });
+
+  populateFlutes();
+  populateMaterials();
+  calculate();
+</script>
+
+</body>
+</html>
