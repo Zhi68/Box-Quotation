@@ -339,8 +339,15 @@
           <select id="flute"></select>
         </div>
         <div class="field">
-          <label>加工费（RM/㎡）</label>
-          <input type="number" id="boardPrice" value="3.5" step="0.01" min="0">
+          <label>加工费输入方式</label>
+          <select id="priceMode">
+            <option value="area">按面积 RM/㎡</option>
+            <option value="ton">按吨价 RM/吨</option>
+          </select>
+        </div>
+        <div class="field">
+          <label id="boardPriceLabel">加工费（RM/㎡）</label>
+          <input type="number" id="boardPriceInput" value="3.5" step="0.01" min="0">
         </div>
       </div>
 
@@ -350,8 +357,8 @@
           <select id="materialType"></select>
         </div>
         <div class="field readonly">
-          <label>加工费换算（RM/吨）</label>
-          <div class="ro-box" id="processPricePerTon">-</div>
+          <label id="boardPriceConvertedLabel">换算（RM/吨）</label>
+          <div class="ro-box" id="boardPriceConverted">-</div>
         </div>
       </div>
     </div>
@@ -563,15 +570,23 @@
     let areaSqm = 0;
     components.forEach(c => { areaSqm += (c.length * c.width) / 1000000; });
 
-    const processPrice = num('boardPrice'); // 加工费 RM/㎡
     const matIdx = parseInt($('materialType').value);
     const mat = activeMaterials[matIdx] || ['-',0,0];
     const matPrice = mat[1];
     const matWeight = mat[2]; // 克重 g/㎡
 
-    // 加工费 RM/㎡ 换算成 RM/吨：1吨 = 1,000,000克，每㎡重 matWeight 克
-    // 所以 1吨对应的面积 = 1,000,000 / matWeight ㎡，加工费(RM/吨) = processPrice × (1,000,000 / matWeight)
-    const processPricePerTon = matWeight > 0 ? processPrice * 1000000 / matWeight : 0;
+    // 加工费可以二选一输入：按面积(RM/㎡) 或 按吨价(RM/吨)，两者根据当前材质克重互相换算
+    // 1吨 = 1,000,000克，每㎡重 matWeight 克 → 1吨对应面积 = 1,000,000 / matWeight ㎡
+    const pMode = $('priceMode').value;
+    const boardInputVal = num('boardPriceInput');
+    let processPrice, processPricePerTon;
+    if(pMode === 'ton'){
+      processPricePerTon = boardInputVal;
+      processPrice = matWeight > 0 ? processPricePerTon * matWeight / 1000000 : 0;
+    } else {
+      processPrice = boardInputVal;
+      processPricePerTon = matWeight > 0 ? processPrice * 1000000 / matWeight : 0;
+    }
 
     const processCost = areaSqm * processPrice * qty;
     const materialCost = areaSqm * matPrice * qty;
@@ -586,7 +601,11 @@
     const totalVol = unitVol * qty;
 
     $('r_prodDims').textContent = `${prod.L.toFixed(1)} × ${prod.W.toFixed(1)} × ${prod.H.toFixed(1)} mm`;
-    $('processPricePerTon').textContent = 'RM ' + processPricePerTon.toFixed(2) + ' /吨';
+    $('boardPriceLabel').textContent = pMode === 'ton' ? '加工费（RM/吨）' : '加工费（RM/㎡）';
+    $('boardPriceConvertedLabel').textContent = pMode === 'ton' ? '换算（RM/㎡）' : '换算（RM/吨）';
+    $('boardPriceConverted').textContent = pMode === 'ton'
+      ? ('RM ' + processPrice.toFixed(4) + ' /㎡')
+      : ('RM ' + processPricePerTon.toFixed(2) + ' /吨');
 
     $('r_area').textContent = areaSqm.toFixed(4) + ' ㎡';
     $('r_material').textContent = 'RM ' + processCost.toFixed(2);
@@ -642,19 +661,41 @@
   }
 
   function resetAll(){
-    const defaults = { qty:1000, L:300, W:200, H:200, boardPrice:3.5 };
+    const defaults = { qty:1000, L:300, W:200, H:200, boardPriceInput:3.5 };
     Object.keys(defaults).forEach(id => { $(id).value = defaults[id]; });
     $('layers').value = '3';
     $('sizeMode').value = 'ID';
     $('boxType').value = 'RSC';
+    $('priceMode').value = 'area';
+    prevPriceMode = 'area';
     populateFlutes();
     $('flute').value = 'AF';
     populateMaterials();
     calculate();
   }
 
+  // 切换「按面积/按吨价」时，自动把输入框的数字换算成新单位下等价的数值
+  // （保证换单位不会偷偷改变实际加工费成本，只是换个填法）
+  let prevPriceMode = 'area';
+  function convertBoardPriceOnModeSwitch(){
+    const newMode = $('priceMode').value;
+    if(newMode === prevPriceMode) return;
+    const matIdx = parseInt($('materialType').value);
+    const mat = activeMaterials[matIdx] || ['-',0,0];
+    const matWeight = mat[2];
+    const oldVal = num('boardPriceInput');
+    if(matWeight > 0){
+      if(prevPriceMode === 'area' && newMode === 'ton'){
+        $('boardPriceInput').value = (oldVal * 1000000 / matWeight).toFixed(2);
+      } else if(prevPriceMode === 'ton' && newMode === 'area'){
+        $('boardPriceInput').value = (oldVal * matWeight / 1000000).toFixed(4);
+      }
+    }
+    prevPriceMode = newMode;
+  }
+
   document.querySelectorAll('input, select').forEach(el => {
-    if(el.id !== 'layers' && el.id !== 'flute'){
+    if(el.id !== 'layers' && el.id !== 'flute' && el.id !== 'priceMode'){
       el.addEventListener('input', calculate);
       el.addEventListener('change', calculate);
     }
@@ -663,6 +704,7 @@
   $('layers').addEventListener('change', () => { populateFlutes(); populateMaterials(); calculate(); });
   $('flute').addEventListener('input', () => { populateMaterials(); calculate(); });
   $('flute').addEventListener('change', () => { populateMaterials(); calculate(); });
+  $('priceMode').addEventListener('change', () => { convertBoardPriceOnModeSwitch(); calculate(); });
 
   populateFlutes();
   populateMaterials();
